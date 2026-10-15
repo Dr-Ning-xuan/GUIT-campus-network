@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$py = 'D:\DSH\campus-login\.venv\Scripts\python.exe'
-$root = 'D:\DSH\campus-login'
+$py = 'D:\campus-login\.venv\Scripts\python.exe'
+$root = 'D:\campus-login'
 $desk = 'D:\Desktop\GUIT校园网一键联网'
 Set-Location $root
 $log = Join-Path $root 'build\ship.log'
