@@ -1,0 +1,30 @@
+# 本文件由 tools/make_version.py 生成，别手改（改 src/version.py）
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 1, 0, 0),
+    prodvers=(1, 1, 0, 0),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+    ),
+  kids=[
+    StringFileInfo(
+      [
+      StringTable(
+        u'080404b0',
+        [StringStruct(u'CompanyName', u'宁轩'),
+        StringStruct(u'FileDescription', u'校园网一键联网 - 自动识别验证码并登录校园网'),
+        StringStruct(u'FileVersion', u'1.1.0.0'),
+        StringStruct(u'InternalName', u'CampusAutoLogin'),
+        StringStruct(u'LegalCopyright', u'宁轩'),
+        StringStruct(u'OriginalFilename', u'GUIT校园网一键联网.exe'),
+        StringStruct(u'ProductName', u'GUIT校园网一键联网'),
+        StringStruct(u'ProductVersion', u'1.1.0.0'),
+        StringStruct(u'Comments', u'迷迭香给宁轩做的喵~')])
+      ]),
+    VarFileInfo([VarStruct(u'Translation', [2052, 1200])])
+  ]
+)
