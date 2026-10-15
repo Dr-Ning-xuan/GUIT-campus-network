@@ -14,7 +14,7 @@ DST = ROOT / "build" / "version_info.txt"
 PRODUCT = "GUIT校园网一键联网"
 OWNER = "宁轩"
 DESC = "校园网一键联网 - 自动识别验证码并登录校园网"
-COMMENT = "迷迭香给宁轩做的喵~"
+COMMENT = "迷迭香喵~"
 
 TEMPLATE = """# 本文件由 tools/make_version.py 生成，别手改（改 src/version.py）
 VSVersionInfo(
