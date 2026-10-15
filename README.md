@@ -41,12 +41,6 @@ PyInstaller onefile 的 bootloader 启动时要：
 
 **第 2 步需要目标目录的 WRITE_DAC 权限。** 实测本机现象：
 
-| TEMP 位置 | 结果 |
-| --- | --- |
-| D:/DSH/...（DSH 工作目录内） | 正常 |
-| C:/Users/宁轩/Desktop/... | 失败：Could not create temporary directory! → 静默退 -1 |
-| C:/Users/宁轩/AppData/Local/Temp | 失败：同上 |
-
 失败时 **Python 一行都不会执行**，连 _boot.log 都写不出来 —— 所以入口 run.py 特意加了「每走一步实时落盘」的取证钩子。
 
 **结论：onedir 不涉及解压，永远安全；onefile 只在 TEMP 可写（有 WRITE_DAC）时能用。**
