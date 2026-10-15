@@ -30,7 +30,7 @@
 | 失败判定 | HTTP 200 + validation-summary-errors 里的中文提示 |
 | 在线状态 | GET /logoff 页的「当前在线状态 已联网/未联网」 |
 | 识别率 | 20/20 张全对，**9 ms/张**（ddddocr，离线） |
-| 链路验证 | 假账号跑 3 次，服务端回「密码长度应大于0小于17!」而不是「验证码错误」→ 取图→识别→提交链路健康 |
+| 链路验证 | 假账号服务端回「密码长度应大于0小于17!」而不是「验证码错误」→ 取图→识别→提交链路健康 |
 
 错误文案翻译覆盖了门户主页 FAQ 的全部条目（并发超限、未实名、欠费、绑定错误、RADIUS 各类回包等），见 service._ERROR_RULES。
 
@@ -95,8 +95,8 @@ $env:UV_CACHE_DIR = 'D:/DSH/campus-login/.uv-cache'
 - 图标（窗口 / 任务栏 / 托盘）取自 `assets/icon.ico`；托盘图标右下角会叠一颗绿/红点表示在线状态。
 - 「运行选项」框右侧是状态立绘：**未联网播 `state-offline.gif`（委屈），已联网切 `state-online.gif`（得意）**，下面是联网状态、当前 IP 和刷新按钮。
 - 「保存账号密码」勾上才把学工号/账号/密码写进 config.json；**不勾时这三个 key 会从文件里整个删掉**（不是写空串），下次打开回落到默认密码 `123456`。
-- 想换图：把新图丢进素材目录（默认 `D:\Desktop\新建文件夹`，1/2/3 三张），跑
-  ``.venv\Scripts\python.exe tools/make_assets.py`，再重新打包即可。
+- 想换图：把新图丢进素材目录 跑
+   `.venv\Scripts\python.exe tools/make_assets.py`，再重新打包即可。
 
 ## 配置
 
