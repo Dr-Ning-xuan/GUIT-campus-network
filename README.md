@@ -1,6 +1,9 @@
 # 校园网一键联网（桂林信息科技学院）
 说真的你信科无敌了，天价网费还限制设备。没事还非要折腾这玩意干什么。
-<img width="382" height="548" alt="已联网" src="https://github.com/user-attachments/assets/e12658fd-ce46-43fa-b222-e9f0f33b28f4" /><img width="382" height="548" alt="未联网" src="https://github.com/user-attachments/assets/f24b3b5e-c132-4bcc-914b-cf5ef2a44457" />
+
+<img width="482" height="597" alt="QQ_1792117708158" src="https://github.com/user-attachments/assets/30be85b4-b60e-4506-bfe2-2df861ff0f5d" />
+<img width="482" height="597" alt="QQ_1792117654520" src="https://github.com/user-attachments/assets/24f588bc-e1f0-426d-866e-28717923ff74" />
+<img width="482" height="597" alt="QQ_1792127536265" src="https://github.com/user-attachments/assets/f9b5449a-b25b-4829-9c5c-c5ab3856511e" />
 
 
 给 [10.6.6.6](http://10.6.6.6) 的「多运营商接入管理平台统一认证系统」做的桌面自动登录器喵~
