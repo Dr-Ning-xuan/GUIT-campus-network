@@ -1,4 +1,4 @@
-"""配置读写：exe 同目录的 config.json（按主人要求明文保存密码）。"""
+"""配置读写：exe 同目录的 config.json（明文保存，方便直接查看和修改）。"""
 from __future__ import annotations
 
 import json
@@ -14,7 +14,7 @@ def hide_file(path: Path | str) -> None:
     """Windows 上给文件加隐藏属性。
 
     config.json / _boot.log 这些是程序自己的东西，躺在 exe 旁边（经常就是桌面）
-    太碍眼了，写完之后直接设成隐藏，主人眼不见心不烦。
+    太碍眼了，写完之后直接设成隐藏属性。
     """
     if os.name != "nt":
         return
@@ -43,10 +43,11 @@ class Config:
     base_url: str = "http://10.6.6.6"
     gui_id: str = ""          # 学(工)号
     account: str = ""         # 上网账号
-    password: str = "123456"  # 明文（主人指定，默认 123456）
+    password: str = "123456"  # 明文保存（默认 123456）
     save_credentials: bool = True   # 关掉后 config.json 里不留账号密码
     isp: str = "自动选择"
     auto_reconnect: bool = False
+    auto_connect_on_start: bool = True   # 打开程序就检查，没在线就自动连上
     poll_seconds: int = 15
     autostart: bool = False
     start_minimized: bool = False

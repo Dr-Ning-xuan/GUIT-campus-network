@@ -1,12 +1,16 @@
 """PySide6 界面：主窗口 + 托盘常驻 + 后台任务。"""
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QObject, QPoint, QSize, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import (
+    QDesktopServices,
     QAction,
     QColor,
     QCloseEvent,
@@ -86,8 +90,26 @@ def _base_pixmap(size: int = 64) -> QPixmap:
     return pm
 
 
+SPEEDTEST_URL = "https://test.ustc.edu.cn/"
+
+_BROWSER_CANDIDATES = (
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+)
+
+
+def _find_browser() -> Optional[str]:
+    """找一个能开 --app 模式的 Chromium 浏览器（Edge 几乎每台 Windows 都有）。"""
+    for c in _BROWSER_CANDIDATES:
+        if os.path.isfile(c):
+            return c
+    return None
+
+
 def app_icon(online: Optional[bool] = None) -> QIcon:
-    """应用图标 = assets/icon.ico（迷迭香），传状态时右下角叠一颗绿/红点。
+    """应用图标 = assets/icon.ico，传状态时右下角叠一颗绿/红点。
 
     多尺寸一起塞进 QIcon，任务栏（32/48）和托盘（16）才不会糊。
     """
@@ -185,12 +207,20 @@ class MainWindow(QMainWindow):
         self._warm.log.connect(lambda m: None)
         self._warm.start()
 
-        self._set_badge(False)   # 开局先委屈着，查到在线再变得意
+        self._set_badge("offline")   # 开局先委屈着，查到在线再变得意
+
+        # 自启项如果还指着单文件版，顺手纠偏到文件夹版（秒开，不会让人以为没生效）
+        try:
+            if autostart.is_enabled() and autostart.is_stale():
+                autostart.enable(True)
+                self._pending_note = "· 已把开机自启改指向文件夹版（启动更快）"
+        except Exception:
+            pass
         self.tray.show()
         if not start_hidden:
             self.show()
         else:
-            self.tray.showMessage(APP_TITLE, "已最小化到托盘运行喵~", QSystemTrayIcon.Information, 2500)
+            self.tray.showMessage(APP_TITLE, "已最小化到托盘运行", QSystemTrayIcon.Information, 2500)
 
         QTimer.singleShot(400, self._initial_state_check)
 
@@ -258,8 +288,12 @@ class MainWindow(QMainWindow):
         self.btn_logoff = QPushButton("断开网络")
         self.btn_logoff.setMinimumHeight(44)
         self.btn_logoff.setFixedWidth(110)
+        self.btn_speed = QPushButton("网络测速")
+        self.btn_speed.setFixedWidth(104)
+        self.btn_speed.setToolTip("打开中国科学技术大学测速网站")
         ops.addWidget(self.btn_login, 1)
         ops.addWidget(self.btn_logoff)
+        ops.addWidget(self.btn_speed)
         root.addLayout(ops)
 
         # 选项（左边选项，右边状态立绘）
@@ -286,6 +320,9 @@ class MainWindow(QMainWindow):
         self.chk_tray = QCheckBox("点关闭按钮时最小化到托盘，不退出")
         self.chk_tray.setChecked(True)
         ov.addWidget(self.chk_tray)
+        self.chk_autoconn = QCheckBox("启动时自动联网（打开就检查，没在线自动连）")
+        self.chk_autoconn.setChecked(self.cfg.auto_connect_on_start)
+        ov.addWidget(self.chk_autoconn)
 
         # 左栏底部那块空白：状态和按钮同一行，IP 落在下面
         self.btn_refresh.setFixedWidth(104)
@@ -324,7 +361,8 @@ class MainWindow(QMainWindow):
         oh.addLayout(right)
 
         self._badge_movie = None
-        self._badge_online = None
+        self._badge_state = None
+        self._startup_auto_done = False
         root.addWidget(opt)
 
         # 验证码预览
@@ -355,7 +393,7 @@ class MainWindow(QMainWindow):
         footer = QHBoxLayout()
         footer.setContentsMargins(2, 0, 2, 0)
         footer.addStretch(1)
-        self.lbl_footer = QLabel("宁轩制作，有最终解释权")
+        self.lbl_footer = QLabel(f"GUIT校园网一键联网  v{APP_VERSION}")
         self.lbl_footer.setStyleSheet("color:#94a3b8;font-size:11px;")
         footer.addWidget(self.lbl_footer)
         root.addLayout(footer)
@@ -381,6 +419,8 @@ class MainWindow(QMainWindow):
         self.btn_logoff.clicked.connect(self.on_logoff)
         self.btn_refresh.clicked.connect(self._initial_state_check)
         self.btn_min.clicked.connect(self.on_minimize)
+        self.btn_speed.clicked.connect(self.on_speedtest)
+        self.chk_autoconn.toggled.connect(lambda _v: self.save_cfg())
         self.cb_show.toggled.connect(
             lambda on: self.ed_pwd.setEchoMode(QLineEdit.Normal if on else QLineEdit.Password)
         )
@@ -409,6 +449,7 @@ class MainWindow(QMainWindow):
         self.cfg.poll_seconds = self.spin_poll.value()
         self.cfg.autostart = self.chk_autostart.isChecked()
         self.cfg.save_credentials = self.chk_save.isChecked()
+        self.cfg.auto_connect_on_start = self.chk_autoconn.isChecked()
         try:
             self.cfg.save()
         except Exception as exc:  # noqa: BLE001
@@ -441,12 +482,21 @@ class MainWindow(QMainWindow):
         self.tray.setToolTip(f"{APP_TITLE} — {'已联网' if online else '未联网'}\n{detail}")
         self._set_badge(online)
 
-    def _set_badge(self, online: bool) -> None:
-        """右侧立绘：未联网播 state-offline.gif，已联网播 state-online.gif。"""
-        online = bool(online)
-        if self._badge_online is online:
+    def _set_badge(self, state) -> None:
+        """右侧立绘三态：online=得意 / offline=委屈 / error=联网出错。
+
+        传 bool 时兼容旧写法（True→online，False→offline）。
+        """
+        if isinstance(state, bool):
+            state = "online" if state else "offline"
+        if self._badge_state == state:
             return
-        path = _asset("state-online.gif" if online else "state-offline.gif")
+        fname = {
+            "online": "state-online.gif",
+            "offline": "state-offline.gif",
+            "error": "state-error.gif",
+        }.get(state, "state-offline.gif")
+        path = _asset(fname)
         if not path:
             return
         movie = QMovie(str(path))
@@ -456,7 +506,7 @@ class MainWindow(QMainWindow):
         self.lbl_badge.setMovie(movie)
         movie.start()
         self._badge_movie = movie      # 必须持引用，否则会被 GC 掉
-        self._badge_online = online
+        self._badge_state = state
 
     def set_busy(self, busy: bool) -> None:
         self.btn_login.setEnabled(not busy)
@@ -477,7 +527,7 @@ class MainWindow(QMainWindow):
     # ---- 动作 --------------------------------------------------------------- #
     def _start_task(self, name: str, fn, lock_ui: bool = True) -> None:
         if self.task and self.task.isRunning():
-            self.log("· 上一个任务还在跑，稍等一下喵~")
+            self.log("· 上一个任务还在跑，请稍候")
             return
         if lock_ui:
             self.set_busy(True)
@@ -494,11 +544,60 @@ class MainWindow(QMainWindow):
         if name == "status":
             # _do_status 返回 (online, detail)，直接喂给状态条
             self.set_state(bool(ok), msg)
-        elif name in ("login", "logoff"):
+            self._maybe_auto_connect(bool(ok))
+        elif name == "login":
+            self.log(("√ " if ok else "× ") + msg)
+            if ok:
+                self._refresh_after()
+            else:
+                # 联网失败：换上出错的表情并停在这里。
+                # 不自动刷新状态，否则 600ms 后又被"未联网"覆盖掉，根本看不到这张图。
+                self._set_badge("error")
+        elif name == "logoff":
             self.log(("√ " if ok else "× ") + msg)
             self._refresh_after()
 
+    def _maybe_auto_connect(self, online: bool) -> None:
+        """启动后第一次查到「没在线」，就顺手连上去。
+
+        "打开软件自动连接"：只在本次启动的第一次状态查询时触发一次，
+        之后手动点「刷新状态」不会再自己登录（免得反复踢掉在线状态）。
+        """
+        if online or self._startup_auto_done:
+            return
+        self._startup_auto_done = True
+        if not self.cfg.auto_connect_on_start:
+            self.log("· 启动检查：未联网，但「启动时自动联网」没勾，先不动")
+            return
+        self.log("· 启动检查：检测到未联网，自动开始联网…")
+        QTimer.singleShot(600, self.on_login)
+
+    def on_speedtest(self) -> None:
+        """测速附页。
+
+        用 Edge/Chrome 的 --app 模式开一个无地址栏窗口：内核是真的，
+        test.ustc.edu.cn 的 backend/pow.php 工作量证明能正常跑，
+        又不用把 200MB 的 QtWebEngine 塞进包里。
+        """
+        browser = _find_browser()
+        if browser:
+            try:
+                subprocess.Popen(
+                    [browser, f"--app={SPEEDTEST_URL}", "--window-size=980,900"],
+                    close_fds=True,
+                )
+                self.log("· 已打开测速页面（中国科学技术大学测速网站）")
+                return
+            except OSError as exc:
+                self.log(f"× 调用浏览器失败：{exc}")
+        QDesktopServices.openUrl(QUrl(SPEEDTEST_URL))
+        self.log("· 已用默认浏览器打开测速页面")
+
     def _initial_state_check(self) -> None:
+        note = getattr(self, "_pending_note", "")
+        if note:
+            self._pending_note = ""
+            self.log(note)
         # 状态查询不锁界面：门户不可达时也不该让按钮变灰
         self._start_task("status", self._do_status, lock_ui=False)
 
@@ -522,7 +621,7 @@ class MainWindow(QMainWindow):
         self.save_cfg()
         cfg = self._login_config()
         if not cfg.gui_id or not cfg.account or not cfg.password:
-            QMessageBox.warning(self, APP_TITLE, "学(工)号 / 上网账号 / 密码 都要填哦喵~")
+            QMessageBox.warning(self, APP_TITLE, "学(工)号 / 上网账号 / 密码 都要填")
             return
 
         def job(log, cap):
@@ -538,7 +637,7 @@ class MainWindow(QMainWindow):
     def on_logoff(self) -> None:
         self.save_cfg()
         cfg = self._login_config()
-        if QMessageBox.question(self, APP_TITLE, "确定要断开网络吗？断开后就要重新认证了喵~") != QMessageBox.Yes:
+        if QMessageBox.question(self, APP_TITLE, "确定要断开网络吗？断开后需要重新认证") != QMessageBox.Yes:
             return
 
         def job(log, cap):
@@ -579,7 +678,7 @@ class MainWindow(QMainWindow):
         if self.tray.isVisible():
             self.tray.showMessage(
                 APP_TITLE,
-                "迷迭香躲进托盘了喵~ 断网会自动帮你连回来",
+                "已最小化到托盘，断网会自动重连",
                 QSystemTrayIcon.Information,
                 2500,
             )
@@ -607,7 +706,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             self.hide()
             self.tray.showMessage(
-                APP_TITLE, "迷迭香躲在托盘里继续守着网络喵~", QSystemTrayIcon.Information, 1800
+                APP_TITLE, "已最小化到托盘，程序继续在后台运行", QSystemTrayIcon.Information, 1800
             )
             return
         if self.reconnector:

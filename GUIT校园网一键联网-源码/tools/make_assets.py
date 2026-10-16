@@ -1,12 +1,13 @@
 """从素材图生成应用图标与状态立绘。
 
 用法:
-    python tools/make_assets.py [素材目录]      # 默认 D:\Desktop\新建文件夹
+    python tools/make_assets.py [素材目录]      # 默认 assets/_src
 
 素材约定（也支持 .jpg/.jpeg/.png/.webp，脚本按真实格式识别，不看扩展名）:
     1.*  -> assets/icon.ico           应用图标（去白底 + 透明 + 多尺寸）
     2.*  -> assets/state-offline.gif  未联网时窗内右下角播放
     3.*  -> assets/state-online.gif   已联网后换成这张
+    4.*  -> assets/state-error.gif    联网失败时换成这张
 
 找不到素材目录时直接跳过（不报错），这样 build.ps1 在别的机器上也能跑。
 """
@@ -19,11 +20,12 @@ from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "assets"
-DEFAULT_SRC = Path(r"D:\Desktop\新建文件夹")
+DEFAULT_SRC = ROOT / "assets" / "_src"
 
 ICON_NAMES = ("1.jpg", "1.jpeg", "1.png", "1.webp")
 OFFLINE_NAMES = ("2.jpg", "2.jpeg", "2.png", "2.webp")
 ONLINE_NAMES = ("3.jpg", "3.jpeg", "3.png", "3.webp")
+ERROR_NAMES = ("4.jpg", "4.jpeg", "4.png", "4.webp")
 
 
 def find(src: Path, names) -> Path | None:
@@ -102,6 +104,9 @@ def main() -> int:
     p3 = find(src, ONLINE_NAMES)
     if p3:
         make_badge(p3, "state-online.gif")
+    p4 = find(src, ERROR_NAMES)
+    if p4:
+        make_badge(p4, "state-error.gif")
 
     print(f"[ok] assets: {', '.join(sorted(x.name for x in OUT.iterdir()))}")
     return 0

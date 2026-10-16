@@ -12,9 +12,9 @@ SRC = ROOT / "src" / "version.py"
 DST = ROOT / "build" / "version_info.txt"
 
 PRODUCT = "GUIT校园网一键联网"
-OWNER = "宁轩"
+OWNER = "GUIT校园网一键联网"
 DESC = "校园网一键联网 - 自动识别验证码并登录校园网"
-COMMENT = "迷迭香喵~"
+COMMENT = "自动识别验证码并登录校园网认证门户"
 
 TEMPLATE = """# 本文件由 tools/make_version.py 生成，别手改（改 src/version.py）
 VSVersionInfo(

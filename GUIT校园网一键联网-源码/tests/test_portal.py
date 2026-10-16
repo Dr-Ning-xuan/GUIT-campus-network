@@ -40,14 +40,14 @@ LOGIN_SNIPPET = """
 
 LOGOFF_ONLINE = """
 <html><body>
-<span>当前用户IP</span> <span><font color="LightGreen">172.22.35.146</font></span>
+<span>当前用户IP</span> <span><font color="LightGreen">203.0.113.45</font></span>
 <span>当前在线状态</span> <span>已联网</span>
 </body></html>
 """
 
 LOGOFF_OFFLINE = """
 <html><body>
-<span>当前用户IP</span><span>172.22.35.146</span>
+<span>当前用户IP</span><span>203.0.113.45</span>
 <span>当前在线状态</span><span>未联网</span>
 </body></html>
 """
@@ -90,7 +90,7 @@ def test_status_parsing(monkeypatch, html, expect_online):
     monkeypatch.setattr(c, "_get", lambda action: html)
     st = c.status()
     assert st.online is expect_online
-    assert st.ip == "172.22.35.146"
+    assert st.ip == "203.0.113.45"
 
 
 def test_status_unreachable(monkeypatch):
@@ -204,7 +204,7 @@ class _FakeClient:
         return self.outcomes.pop(0)
 
     def status(self):
-        return PortalStatus(online=True, ip="172.22.35.146")
+        return PortalStatus(online=True, ip="203.0.113.45")
 
 
 class _FakeSolver:

@@ -1,8 +1,8 @@
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$py = 'D:\campus-login\.venv\Scripts\python.exe'
-$root = 'D:\campus-login'
-$desk = 'D:\Desktop\GUIT校园网一键联网'
+$root = Split-Path -Parent $PSScriptRoot
+$py = Join-Path $root '.venv\Scripts\python.exe'
+$desk = Join-Path ([Environment]::GetFolderPath('Desktop')) 'GUIT校园网一键联网'
 Set-Location $root
 $log = Join-Path $root 'build\ship.log'
 "=== ship started $(Get-Date -Format o) ===" | Out-File $log -Encoding utf8
@@ -71,7 +71,7 @@ if (Test-Path (Join-Path $desk 'config.json')) {
 Remove-Item $desk -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Item (Join-Path $root 'dist-onedir\GUIT校园网一键联网') $desk -Recurse -Force
 if (Test-Path $bak) { Copy-Item $bak (Join-Path $desk 'config.json') -Force }
-Copy-Item (Join-Path $root 'dist\GUIT校园网一键联网.exe') 'D:\Desktop\GUIT校园网一键联网.exe' -Force
+Copy-Item (Join-Path $root 'dist\GUIT校园网一键联网.exe') (Join-Path ([Environment]::GetFolderPath('Desktop')) 'GUIT校园网一键联网.exe') -Force
 
 Remove-Item (Join-Path $desk '_selftest.log') -Force -ErrorAction SilentlyContinue
 $p = Start-Process -FilePath (Join-Path $desk '校园网一键联网.exe') -ArgumentList '--selftest' -PassThru -Wait

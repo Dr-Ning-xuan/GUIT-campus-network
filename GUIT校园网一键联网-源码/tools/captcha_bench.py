@@ -1,7 +1,7 @@
 """验证码识别率压测：抓 N 张真图、识别、存盘，供人工核对。
 
 用法：
-    python tools/captcha_bench.py --count 30 --out D:\DSH\tmp\captcha-bench
+    python tools/captcha_bench.py --count 30 --out ./build/captcha-bench
 """
 from __future__ import annotations
 

@@ -68,5 +68,5 @@ if ($LASTEXITCODE -ne 0) { throw '产物验证失败' }
 
 $exe = Join-Path $dist 'GUIT校园网一键联网.exe'
 Write-Host ''
-Write-Host ('打包完成喵~ ' + $exe) -ForegroundColor Green
+Write-Host ('打包完成：' + $exe) -ForegroundColor Green
 Write-Host ('大小：' + [math]::Round((Get-Item $exe).Length / 1MB, 1) + ' MB')

@@ -13,7 +13,7 @@ def _single_instance() -> bool:
         import ctypes
 
         kernel32 = ctypes.windll.kernel32
-        kernel32.CreateMutexW(None, False, "Global\\CampusAutoLogin_Rosmontis")
+        kernel32.CreateMutexW(None, False, "Global\\GUITCampusAutoLogin")
         return kernel32.GetLastError() != 183  # ERROR_ALREADY_EXISTS
     except Exception:
         return True
@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
         return _selftest()
 
     if not args.no_single_instance and not _single_instance():
-        print("已经有一个在跑了喵~")
+        print("程序已经在运行中")
         return 0
 
     from PySide6.QtCore import Qt
@@ -147,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         import ctypes
 
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Rosmontis.CampusAutoLogin")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GUIT.CampusAutoLogin")
     except Exception:
         pass
 
