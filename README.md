@@ -1,4 +1,5 @@
 # 校园网一键联网（桂林信息科技学院）
+不是怎么又更新验证码了？
 说真的你信科无敌了，天价网费还限制设备。没事还非要折腾这玩意干什么。
 
 <img width="382" height="597" alt="QQ_1792117708158" src="https://github.com/user-attachments/assets/30be85b4-b60e-4506-bfe2-2df861ff0f5d" />
