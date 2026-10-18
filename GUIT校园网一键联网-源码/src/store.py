@@ -51,8 +51,8 @@ class Config:
     poll_seconds: int = 15
     autostart: bool = False
     start_minimized: bool = False
-    manual_captcha: bool = False   # 识别失败时允许手动输入
-    max_captcha_retry: int = 6
+    manual_captcha: bool = True    # 识别失败时允许手动输入（新算式验证码容易认歪，默认开着）
+    max_captcha_retry: int = 10    # 最多提交几次；算式验证码认错概率不低，多给几次机会
 
     # -- 读写 ---------------------------------------------------------------- #
     @classmethod

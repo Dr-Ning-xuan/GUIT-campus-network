@@ -26,6 +26,9 @@ DEFAULT_BASE = "http://10.6.6.6"
 LOGIN_ACTION = "/login"
 LOGOFF_ACTION = "/logoff"
 CHECKING_ACTION = "/checking"
+# 登录页的验证码是「算式题」（200x60），注销/查询页还是老的四位字母数字（80x24）。
+# 两个接口各自独立生成答案，混用会拿到对不上的图。
+CAPTCHA_LOGIN_ACTION = "/ACaptcha.ashx"
 CAPTCHA_ACTION = "/CheckCode"
 
 _NO_CACHE_HEADERS = {
@@ -193,19 +196,26 @@ class PortalClient:
 
     # -- 公共 API ------------------------------------------------------------ #
     def prepare_login(self) -> LoginForm:
-        """取登录页隐藏字段 + 一张全新验证码（同一 session）。"""
+        """取登录页隐藏字段 + 一张全新验证码（同一 session）。
+
+        注意验证码必须走 /ACaptcha.ashx：登录页那张 200x60 的算式图就是它出的，
+        而 /CheckCode 是注销页和查询页的（四位字母数字），拿错了图必然对不上。
+        """
         page = self._get(LOGIN_ACTION)
         hidden = dict(_parse_page(page).hidden)
-        captcha = self.fetch_captcha()
+        captcha = self.fetch_captcha(CAPTCHA_LOGIN_ACTION)
         return LoginForm(hidden=hidden, captcha_png=captcha)
 
-    def fetch_captcha(self) -> bytes:
+    def fetch_captcha(self, action: str = CAPTCHA_ACTION) -> bytes:
         """单独取一张新验证码（会覆盖服务端 session 里的答案）。
+
+        action 决定取哪一套：登录用 CAPTCHA_LOGIN_ACTION（算式），
+        注销/查询用 CAPTCHA_ACTION（四位字母数字）。
 
         带随机 query 做 cache-buster：实测偶发撞到过同一张图（字节流完全一致），
         加这个参数对服务端无影响，但能挡掉中间层缓存拿到旧图。
         """
-        url = f"{self.base}{CAPTCHA_ACTION}?t={random.random():.16f}"
+        url = f"{self.base}{action}?t={random.random():.16f}"
         try:
             r = self.session.get(url, timeout=self.timeout)
         except requests.RequestException as exc:

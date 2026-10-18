@@ -24,6 +24,8 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QFrame,
     QGroupBox,
@@ -42,15 +44,18 @@ from PySide6.QtWidgets import (
 )
 
 from . import autostart
-from .ocr import CaptchaSolver
+from .ocr import CaptchaSolver, MathCaptcha, MathCaptchaSolver, get_math_solver
 from .service import (
     AutoReconnector,
     LoginConfig,
     attempt_login,
     check_status,
     do_logoff,
+    prepare_manual_login,
+    submit_manual_login,
 )
 from .store import Config, config_path
+from .wakeup import WakeupServer
 
 from src.version import __version__ as APP_VERSION
 
@@ -172,14 +177,62 @@ class Bridge(QObject):
     state = Signal(bool, str)
 
 
+class _ManualCaptchaDialog(QDialog):
+    """自动识别失败时的兜底：把算式图摆出来，让主人自己填结果。"""
+
+    def __init__(self, png: bytes, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("手动输入验证码")
+        self.setMinimumWidth(360)
+
+        lay = QVBoxLayout(self)
+        tip = QLabel("自动识别没认出这道算式。看一眼图，把结果填进下面。")
+        tip.setWordWrap(True)
+        lay.addWidget(tip)
+
+        img = QLabel()
+        img.setAlignment(Qt.AlignCenter)
+        pix = QPixmap()
+        if png:
+            pix.loadFromData(png)
+            if not pix.isNull():
+                img.setPixmap(
+                    pix.scaled(QSize(320, 96), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                )
+        img.setMinimumHeight(96)
+        img.setStyleSheet("background:#ffffff;border:1px solid #cbd5e1;border-radius:6px;")
+        lay.addWidget(img)
+
+        self.edit = QLineEdit()
+        self.edit.setPlaceholderText("算式结果，例如 66")
+        self.edit.setMaxLength(4)
+        lay.addWidget(self.edit)
+
+        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, parent=self)
+        box.accepted.connect(self.accept)
+        box.rejected.connect(self.reject)
+        lay.addWidget(box)
+        self.edit.returnPressed.connect(self.accept)
+
+    def value(self) -> str:
+        return self.edit.text().strip()
+
+
 # --------------------------------------------------------------------------- #
 # 主窗口
 # --------------------------------------------------------------------------- #
 class MainWindow(QMainWindow):
-    def __init__(self, cfg: Config, solver: CaptchaSolver, start_hidden: bool = False) -> None:
+    def __init__(
+        self,
+        cfg: Config,
+        solver: CaptchaSolver,
+        math_solver: Optional[MathCaptchaSolver] = None,
+        start_hidden: bool = False,
+    ) -> None:
         super().__init__()
         self.cfg = cfg
-        self.solver = solver
+        self.solver = solver                       # 四位字母数字（注销/查询用）
+        self.math_solver = math_solver or get_math_solver()   # 算式（登录用）
         self.task: Optional[TaskThread] = None
         self.bridge = Bridge()
         self.reconnector: Optional[AutoReconnector] = None
@@ -195,14 +248,23 @@ class MainWindow(QMainWindow):
 
         self.reconnector = AutoReconnector(
             get_cfg=self._login_config,
-            solver=self.solver,
+            solver=self.math_solver,
             interval=lambda: self.spin_poll.value(),
             log=self.bridge.log.emit,
             on_state=self.bridge.state.emit,
         )
 
+        # 常驻监听：别的实例双击时敲一下这个事件，我们就自己把窗口亮出来
+        self._wake = WakeupServer()
+        self._wake.create()
+        self._wake_timer = QTimer(self)
+        self._wake_timer.timeout.connect(self._poll_wake)
+        self._wake_timer.start(250)
+
         # 预热识别引擎（不占界面）
-        self._warm = TaskThread(lambda l, c: (self.solver.warmup() or True, "识别引擎就绪"))
+        self._warm = TaskThread(
+            lambda l, c: (self.math_solver.warmup() or True, "识别引擎就绪")
+        )
         self._warm.done.connect(lambda ok, msg: self.log("· 验证码识别引擎已就绪"))
         self._warm.log.connect(lambda m: None)
         self._warm.start()
@@ -463,6 +525,8 @@ class MainWindow(QMainWindow):
             password=self.ed_pwd.text(),
             isp=self.cb_isp.currentText(),
             max_captcha_retry=self.cfg.max_captcha_retry,
+            max_blank_tries=max(10, int(self.cfg.max_captcha_retry) * 3),
+            manual_captcha=bool(self.cfg.manual_captcha),
         )
 
     # ---- 界面状态 ----------------------------------------------------------- #
@@ -522,7 +586,7 @@ class MainWindow(QMainWindow):
                 self.lbl_capimg.setPixmap(
                     pix.scaled(self.lbl_capimg.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 )
-        self.lbl_cap.setText(f"验证码：{code or '识别失败'}")
+        self.lbl_cap.setText(f"算式：{code or '未识别'}")
 
     # ---- 动作 --------------------------------------------------------------- #
     def _start_task(self, name: str, fn, lock_ui: bool = True) -> None:
@@ -553,9 +617,44 @@ class MainWindow(QMainWindow):
                 # 联网失败：换上出错的表情并停在这里。
                 # 不自动刷新状态，否则 600ms 后又被"未联网"覆盖掉，根本看不到这张图。
                 self._set_badge("error")
+                if "验证码连续识别失败" in msg:
+                    # 自动认不出来：给张新图让主人自己填，别就这么算了
+                    QTimer.singleShot(200, self._offer_manual_captcha)
         elif name == "logoff":
             self.log(("√ " if ok else "× ") + msg)
             self._refresh_after()
+
+    def _offer_manual_captcha(self) -> None:
+        """自动认不出算式时，取一张新图让主人手输，别把这一轮白白扔掉。"""
+        cfg = self._login_config()
+        if not getattr(cfg, "manual_captcha", False):
+            self.log("· 「手动输入验证码」没开，跳过兜底（可在 config.json 里打开）")
+            return
+        self.log("· 自动识别失败，取一张新图请主人手动输入…")
+        manual = prepare_manual_login(cfg, log=self.log)
+        if manual is None:
+            return
+        dlg = _ManualCaptchaDialog(manual.captcha_png, self)
+        if dlg.exec() != QDialog.Accepted:
+            self.log("· 已取消手动输入验证码")
+            return
+        answer = dlg.value()
+        if not answer:
+            return
+        self.set_busy(True)
+        try:
+            out = submit_manual_login(cfg, manual, answer, log=self.log)
+        except Exception as exc:  # noqa: BLE001
+            self.log(f"× 手动提交异常：{exc}")
+            self.set_busy(False)
+            return
+        self.set_busy(False)
+        self.log(("√ " if out.ok else "× ") + out.message)
+        if out.ok:
+            self._set_badge("online")
+            self._refresh_after()
+        else:
+            self._set_badge("error")
 
     def _maybe_auto_connect(self, online: bool) -> None:
         """启动后第一次查到「没在线」，就顺手连上去。
@@ -629,7 +728,13 @@ class MainWindow(QMainWindow):
             st = check_status(cfg.base_url, timeout=6)
             if st.reachable and st.online:
                 return True, f"已经在线啦（{st.ip}），不用重复登录"
-            out = attempt_login(cfg, self.solver, log=log, on_captcha=cap)
+            # cap 是 Signal(bytes, str) 的 emit；算式对象要先转成人话再发
+            out = attempt_login(
+                cfg,
+                self.math_solver,
+                log=log,
+                on_captcha=lambda png, c: cap(png, c.describe()),
+            )
             return out.ok, out.message
 
         self._start_task("login", job)
@@ -687,6 +792,14 @@ class MainWindow(QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
+
+    def _poll_wake(self) -> None:
+        """别的实例在敲门：把窗口叫回来。"""
+        if self._wake.poll():
+            if self.isMinimized():
+                self.showNormal()
+            self.show_window()
+            self.log("· 已经有一份在跑，把窗口叫出来了")
 
     def on_tray_activated(self, reason) -> None:
         if reason == QSystemTrayIcon.DoubleClick:

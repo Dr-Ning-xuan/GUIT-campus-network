@@ -20,7 +20,9 @@ from src.store import Config  # noqa: E402
 
 def main() -> int:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else (ROOT / "build" / "gui-shot.png")
-    force_offline = len(sys.argv) > 2 and sys.argv[2] == "offline"
+    mode = sys.argv[2] if len(sys.argv) > 2 else ""
+    force_offline = mode == "offline"
+    fake_online = mode == "online"
     out.parent.mkdir(parents=True, exist_ok=True)
 
     app = QApplication(sys.argv)
@@ -38,8 +40,17 @@ def main() -> int:
     win.show()
 
     def shoot() -> None:
-        if force_offline:
-            win.set_state(False, "未联网")
+        if force_offline or fake_online:
+            # 截图一律用假数据：假 IP（RFC5737 文档地址）+ 假账号，
+            # 而且必须清掉日志框 —— 启动时的真实状态查询会把本机内网 IP 写进去。
+            win.txt_log.clear()
+            win.log("· 验证码识别引擎已就绪")
+            if fake_online:
+                win.set_state(True, "203.0.113.45")
+                win.log("· 状态查询：已联网 203.0.113.45")
+            else:
+                win.set_state(False, "")
+                win.log("· 状态查询：未联网")
             QTimer.singleShot(700, lambda: (win.grab().save(str(out)), print(f"[OK] {out}"), app.quit()))
             return
         win.grab().save(str(out))
