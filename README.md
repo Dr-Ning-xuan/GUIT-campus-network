@@ -13,7 +13,6 @@
 
 > 纯 HTTP 协议实现，**不驱动浏览器**：直接取验证码图片 → 离线 OCR → POST 表单。
 
-![界面截图](docs/screenshot-online.png)
 
 <sub>未联网 / 已联网 / 联网失败 三种状态右侧会切换不同立绘</sub>
 
