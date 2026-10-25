@@ -1,0 +1,9 @@
+[selftest] python 3.11.9  frozen=False
+[selftest] requests OK
+[selftest] PySide6 OK (6.12.0)
+[selftest] ddddocr 4位 OK, sample[1040B] -> '6MH8'
+[selftest] 算式识别 -> 55+9 = 64（3 票）
+[selftest] config path = D:\DSH\campus-login\config.json
+[selftest] Config OK
+[selftest] gui import OK
+[SELFTEST OK]

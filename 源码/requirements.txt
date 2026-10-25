@@ -1,0 +1,8 @@
+# 只装 Essentials —— 不要 PySide6 元包（它会拉 131MB 的 WebEngine，本程序用不到）
+PySide6-Essentials>=6.7.0
+ddddocr>=1.5.6
+requests>=2.31.0
+
+# 开发/打包期
+pyinstaller>=6.6.0
+pytest>=8.0.0
